@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harmonogram transportowy</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --surface-0: #f5f4f0;
+    --surface-1: #f0efeb;
+    --surface-2: #ffffff;
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-muted: #888780;
+    --border: rgba(0,0,0,0.1);
+    --border-strong: rgba(0,0,0,0.18);
+    --bg-accent: #e6f1fb;
+    --text-accent: #185fa5;
+    --border-accent: #b5d4f4;
+    --radius: 8px;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-0: #1c1c1a;
+      --surface-1: #242422;
+      --surface-2: #2e2e2b;
+      --text-primary: #e8e7e2;
+      --text-secondary: #a0a09a;
+      --text-muted: #6a6a65;
+      --border: rgba(255,255,255,0.1);
+      --border-strong: rgba(255,255,255,0.18);
+      --bg-accent: #0c447c;
+      --text-accent: #b5d4f4;
+      --border-accent: #185fa5;
+    }
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--surface-0);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 1.5rem;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .toolbar select,
+  .toolbar input {
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+  }
+
+  .toolbar button {
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: background 0.1s;
+  }
+
+  .toolbar button:hover { background: var(--surface-1); }
+
+  .toolbar button.primary {
+    background: var(--bg-accent);
+    color: var(--text-accent);
+    border-color: var(--border-accent);
+  }
+
+  .legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    font-size: 11px;
+    color: var(--text-secondary);
+    align-items: center;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+  .grid-wrapper { overflow-x: auto; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 52px repeat(5, minmax(110px, 1fr));
+    gap: 5px;
+    min-width: 620px;
+  }
+
+  .header-cell {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 6px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .week-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 8px;
+  }
+
+  .day-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 36px;
+    padding: 2px;
+    border-radius: var(--radius);
+    transition: background 0.1s;
+  }
+
+  .day-col.drag-over { background: var(--bg-accent); }
+
+  .kurs-card {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 0.5px solid transparent;
+    user-select: none;
+    transition: opacity 0.12s;
+  }
+
+  .kurs-card:hover { opacity: 0.8; }
+  .kurs-card.linked { border-color: rgba(0,0,0,0.15); }
+
+  .kurs-card .del {
+    font-size: 10px;
+    opacity: 0;
+    margin-left: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .kurs-card:hover .del { opacity: 0.55; }
+
+  .row-sep {
+    grid-column: 1 / -1;
+    border-top: 0.5px solid var(--border);
+    margin: 3px 0;
+  }
+
+  /* Modal */
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+
+  .modal {
+    background: var(--surface-2);
+    border-radius: 12px;
+    border: 0.5px solid var(--border);
+    padding: 1.25rem;
+    width: 300px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+
+  .modal h3 {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .modal label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 3px;
+  }
+
+  .modal select,
+  .modal input {
+    width: 100%;
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border-strong);
+    background: var(--surface-1);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+  }
+
+  .modal .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 1.25rem;
+  }
+
+  .modal .actions button {
+    flex: 1;
+    font-size: 13px;
+    padding: 7px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border-strong);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    background: var(--surface-2);
+    color: var(--text-primary);
+  }
+
+  .modal .actions button.ok {
+    background: var(--bg-accent);
+    color: var(--text-accent);
+    border-color: var(--border-accent);
+  }
+
+  .badge-rozpisane {
+    font-size: 10px;
+    background: #c0dd97;
+    color: #3b6d11;
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-left: 4px;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<h1>Harmonogram</h1>
+
+<div class="toolbar">
+  <select id="filterWeek">
+    <option value="all">Wszystkie tygodnie</option>
+  </select>
+  <button class="primary" onclick="openAddModal()">+ Dodaj kurs</button>
+  <button onclick="exportJSON()"><i class="ti ti-download" aria-hidden="true"></i> Eksport JSON</button>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#c0dd97"></div>Powiązany z Rozpisane</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#b5d4f4"></div>Nowy / bez powiązania</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fac775"></div>Uwaga</div>
+</div>
+
+<div class="grid-wrapper">
+  <div class="grid" id="grid">
+    <div class="header-cell"></div>
+    <div class="header-cell">PN</div>
+    <div class="header-cell">WT</div>
+    <div class="header-cell">ŚR</div>
+    <div class="header-cell">CZW</div>
+    <div class="header-cell">PT</div>
+  </div>
+</div>
+
+<div id="modal-container"></div>
+
+<script>
+const DAYS = ['PN','WT','ŚR','CZW','PT'];
+const TRASY = ['Kraków','Warszawa','Lublin','Wrocław','Szczecin','Poznań','Toruń','Białystok','Śląsk','Rzeszów','Krotoszyn','Ostrów','Kępno','Zielona Góra'];
+const ROZPISANE = ['Poznań 12','Lublin 12'];
+
+const initialData = {
+  26: {
+    PN: [{trasa:'Kraków',num:9,linked:false},{trasa:'Warszawa',num:23,linked:false},{trasa:'Ostrów',num:8,linked:false}],
+    WT: [{trasa:'Szczecin',num:11,linked:false},{trasa:'Warszawa',num:24,linked:false},{trasa:'Krotoszyn',num:'',linked:false}],
+    ŚR: [{trasa:'Szczecin',num:'',linked:false},{trasa:'Warszawa',num:24,linked:false}],
+    CZW: [{trasa:'Toruń',num:9,linked:false},{trasa:'Warszawa',num:'',linked:false}],
+    PT: [{trasa:'Toruń',num:'',linked:false},{trasa:'Poznań',num:12,linked:true,rozpisane:'Poznań 12'}],
+  },
+  27: {
+    PN: [{trasa:'Lublin',num:12,linked:true,rozpisane:'Lublin 12'},{trasa:'Wrocław',num:15,linked:false}],
+    WT: [{trasa:'Lublin',num:'',linked:false},{trasa:'Śląsk',num:13,linked:false}],
+    ŚR: [{trasa:'Białystok',num:8,linked:false},{trasa:'Śląsk',num:'',linked:false}],
+    CZW: [{trasa:'Białystok',num:'',linked:false},{trasa:'Śląsk',num:14,linked:false}],
+    PT: [{trasa:'Wrocław',num:16,linked:false},{trasa:'Śląsk',num:'',linked:false}],
+  },
+  28: {
+    PN: [{trasa:'Wrocław',num:17,linked:false},{trasa:'Szczecin',num:13,linked:false},{trasa:'Ostrów',num:8,linked:false}],
+    WT: [{trasa:'Warszawa',num:25,linked:false},{trasa:'Szczecin',num:'',linked:false}],
+    ŚR: [{trasa:'Warszawa',num:26,linked:false}],
+    CZW: [{trasa:'Kraków',num:11,linked:false},{trasa:'Warszawa',num:'',linked:false}],
+    PT: [{trasa:'Kraków',num:'',linked:false},{trasa:'Zielona Góra',num:'',linked:false}],
+  },
+  29: {
+    PN: [{trasa:'Kraków',num:10,linked:false},{trasa:'Warszawa',num:27,linked:false},{trasa:'Ostrów',num:8,linked:false}],
+    WT: [{trasa:'Kraków',num:'',linked:false},{trasa:'Toruń',num:11,linked:false},{trasa:'Warszawa',num:'',linked:false}],
+    ŚR: [{trasa:'Toruń',num:'',linked:false},{trasa:'Lublin',num:14,linked:false}],
+    CZW: [{trasa:'Toruń',num:10,linked:false},{trasa:'Lublin',num:'',linked:false}],
+    PT: [{trasa:'Toruń',num:'',linked:false},{trasa:'Kępno',num:5,linked:false}],
+  },
+  30: {
+    PN: [{trasa:'Rzeszów',num:13,linked:false},{trasa:'Wrocław',num:18,linked:false}],
+    WT: [{trasa:'Rzeszów',num:'',linked:false},{trasa:'Śląsk',num:15,linked:false}],
+    ŚR: [{trasa:'Śląsk',num:16,linked:false},{trasa:'Śląsk',num:'',linked:false}],
+    CZW: [{trasa:'Śląsk',num:'',linked:false},{trasa:'Białystok',num:9,linked:false}],
+    PT: [{trasa:'Wrocław',num:19,linked:false},{trasa:'Białystok',num:'',linked:false}],
+  },
+  31: {
+    PN: [{trasa:'Warszawa',num:28,linked:false},{trasa:'Poznań',num:'',linked:true,rozpisane:'Poznań 12'}],
+    WT: [{trasa:'Warszawa',num:'',linked:false},{trasa:'Szczecin',num:14,linked:false}],
+    ŚR: [{trasa:'Szczecin',num:15,linked:false},{trasa:'Szczecin',num:'',linked:false}],
+    CZW: [{trasa:'Szczecin',num:'',linked:false},{trasa:'Toruń',num:12,linked:false}],
+    PT: [{trasa:'Ostrów',num:9,linked:false},{trasa:'Toruń',num:'',linked:false}],
+  },
+  32: {
+    PN: [{trasa:'Kraków',num:12,linked:false}],
+    WT: [{trasa:'Kraków',num:'',linked:false}],
+    ŚR: [],
+    CZW: [],
+    PT: [],
+  }
+};
+
+let data = JSON.parse(JSON.stringify(initialData));
+let filterWeek = 'all';
+let editTarget = null;
+
+function getColor(card) {
+  if (card.linked) return {bg:'#c0dd97',text:'#27500a'};
+  if (card.uwaga) return {bg:'#fac775',text:'#633806'};
+  return {bg:'#b5d4f4',text:'#0c447c'};
+}
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  const weeks = Object.keys(data).map(Number).sort((a,b)=>a-b);
+  const visibleWeeks = filterWeek === 'all' ? weeks : weeks.filter(w => w == filterWeek);
+
+  const toRemove = [];
+  grid.childNodes.forEach(n => {
+    if (!n.classList || !n.classList.contains('header-cell')) toRemove.push(n);
+  });
+  toRemove.forEach(n => n.remove());
+
+  visibleWeeks.forEach((week, wi) => {
+    if (wi > 0) {
+      const sep = document.createElement('div');
+      sep.className = 'row-sep';
+      grid.appendChild(sep);
+    }
+
+    const wLabel = document.createElement('div');
+    wLabel.className = 'week-label';
+    wLabel.textContent = week;
+    grid.appendChild(wLabel);
+
+    DAYS.forEach(day => {
+      const col = document.createElement('div');
+      col.className = 'day-col';
+      col.dataset.week = week;
+      col.dataset.day = day;
+
+      (data[week][day] || []).forEach((card, ci) => {
+        const el = document.createElement('div');
+        el.className = 'kurs-card' + (card.linked ? ' linked' : '');
+        const c = getColor(card);
+        el.style.background = c.bg;
+        el.style.color = c.text;
+        el.draggable = true;
+        el.dataset.week = week;
+        el.dataset.day = day;
+        el.dataset.idx = ci;
+
+        const name = card.trasa + (card.num !== '' && card.num !== undefined ? ' ' + card.num : '');
+        el.innerHTML = `<span>${name}</span><span class="del" data-week="${week}" data-day="${day}" data-ci="${ci}">✕</span>`;
+
+        el.querySelector('.del').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const w = parseInt(e.target.dataset.week);
+          const d = e.target.dataset.day;
+          const i = parseInt(e.target.dataset.ci);
+          data[w][d].splice(i, 1);
+          buildGrid();
+        });
+
+        el.addEventListener('click', (e) => {
+          if (e.target.classList.contains('del')) return;
+          openEditModal(week, day, ci);
+        });
+
+        el.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', JSON.stringify({week, day, ci}));
+        });
+
+        col.appendChild(el);
+      });
+
+      col.addEventListener('dragover', e => {
+        e.preventDefault();
+        col.classList.add('drag-over');
+      });
+      col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+      col.addEventListener('drop', e => {
+        e.preventDefault();
+        col.classList.remove('drag-over');
+        try {
+          const src = JSON.parse(e.dataTransfer.getData('text/plain'));
+          const card = data[src.week][src.day].splice(src.ci, 1)[0];
+          if (!data[week][day]) data[week][day] = [];
+          data[week][day].push(card);
+          buildGrid();
+        } catch(err) {}
+      });
+
+      grid.appendChild(col);
+    });
+  });
+}
+
+function openAddModal() {
+  const weeks = Object.keys(data).map(Number).sort((a,b)=>a-b);
+  const weekOpts = weeks.map(w => `<option value="${w}">${w}</option>`).join('');
+  const trasaOpts = TRASY.map(t => `<option value="${t}">${t}</option>`).join('');
+  const rozpOpts = ['— brak —', ...ROZPISANE].map(r => `<option value="${r}">${r}</option>`).join('');
+  const dayOpts = DAYS.map(d => `<option value="${d}">${d}</option>`).join('');
+
+  document.getElementById('modal-container').innerHTML = `
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal">
+      <h3>Dodaj kurs</h3>
+      <label>Tydzień</label>
+      <select id="m-week">${weekOpts}</select>
+      <label>Dzień</label>
+      <select id="m-day">${dayOpts}</select>
+      <label>Trasa</label>
+      <select id="m-trasa">${trasaOpts}</select>
+      <label>Numer (opcjonalnie)</label>
+      <input id="m-num" type="number" placeholder="np. 12" min="1" max="99">
+      <label>Powiąż z Rozpisane</label>
+      <select id="m-link">${rozpOpts}</select>
+      <div class="actions">
+        <button onclick="closeModal()">Anuluj</button>
+        <button class="ok" onclick="saveAdd()">Dodaj</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('modal-bg').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+}
+
+function openEditModal(week, day, ci) {
+  editTarget = {week, day, ci};
+  const card = data[week][day][ci];
+  const trasaOpts = TRASY.map(t => `<option value="${t}" ${t === card.trasa ? 'selected' : ''}>${t}</option>`).join('');
+  const rozpOpts = ['— brak —', ...ROZPISANE].map(r => `<option value="${r}" ${card.rozpisane === r ? 'selected' : ''}>${r}</option>`).join('');
+
+  document.getElementById('modal-container').innerHTML = `
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal">
+      <h3>Edytuj — tydzień ${week}, ${day}</h3>
+      <label>Trasa</label>
+      <select id="m-trasa">${trasaOpts}</select>
+      <label>Numer</label>
+      <input id="m-num" type="number" value="${card.num || ''}" placeholder="np. 12" min="1" max="99">
+      <label>Powiąż z Rozpisane</label>
+      <select id="m-link">${rozpOpts}</select>
+      <div class="actions">
+        <button onclick="closeModal()">Anuluj</button>
+        <button class="ok" onclick="saveEdit()">Zapisz</button>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('modal-bg').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+}
+
+function saveAdd() {
+  const week = parseInt(document.getElementById('m-week').value);
+  const day = document.getElementById('m-day').value;
+  const trasa = document.getElementById('m-trasa').value;
+  const numVal = document.getElementById('m-num').value;
+  const link = document.getElementById('m-link').value;
+  const isLinked = link !== '— brak —';
+  if (!data[week]) data[week] = {PN:[],WT:[],ŚR:[],CZW:[],PT:[]};
+  if (!data[week][day]) data[week][day] = [];
+  data[week][day].push({
+    trasa,
+    num: numVal ? parseInt(numVal) : '',
+    linked: isLinked,
+    rozpisane: isLinked ? link : null
+  });
+  closeModal();
+  buildGrid();
+}
+
+function saveEdit() {
+  const {week, day, ci} = editTarget;
+  const trasa = document.getElementById('m-trasa').value;
+  const numVal = document.getElementById('m-num').value;
+  const link = document.getElementById('m-link').value;
+  const isLinked = link !== '— brak —';
+  data[week][day][ci] = {
+    trasa,
+    num: numVal ? parseInt(numVal) : '',
+    linked: isLinked,
+    rozpisane: isLinked ? link : null
+  };
+  closeModal();
+  buildGrid();
+}
+
+function closeModal() {
+  document.getElementById('modal-container').innerHTML = '';
+  editTarget = null;
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'harmonogram.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const filterEl = document.getElementById('filterWeek');
+Object.keys(data).sort((a,b)=>a-b).forEach(w => {
+  const o = document.createElement('option');
+  o.value = w;
+  o.textContent = 'Tydzień ' + w;
+  filterEl.appendChild(o);
+});
+filterEl.addEventListener('change', () => {
+  filterWeek = filterEl.value;
+  buildGrid();
+});
+
+buildGrid();
+</script>
+</body>
+</html>
